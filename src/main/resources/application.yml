@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: card-auth-simulator
+  jpa:
+    open-in-view: false
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
