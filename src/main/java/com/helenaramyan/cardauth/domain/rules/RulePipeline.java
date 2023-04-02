@@ -1,6 +1,7 @@
 package com.helenaramyan.cardauth.domain.rules;
 
 import com.helenaramyan.cardauth.domain.AuthorizationResult;
+import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -17,6 +18,21 @@ public final class RulePipeline {
     public RulePipeline(List<AuthorizationRule> rules, AuthCodeGenerator authCodes) {
         this.rules = List.copyOf(Objects.requireNonNull(rules, "rules"));
         this.authCodes = Objects.requireNonNull(authCodes, "authCodes");
+    }
+
+    /**
+     * The issuer's standard order: identity and status of the card first, then what the
+     * merchant is, then how much, and only at the very end whether the money is there.
+     */
+    public static RulePipeline standard(Clock clock, RuleSettings settings, AuthCodeGenerator authCodes) {
+        return new RulePipeline(List.of(
+                new CardPresentRule(),
+                new CardStatusRule(),
+                new CardExpiryRule(clock),
+                new MccBlocklistRule(settings.blockedMccs()),
+                new AmountLimitRule(settings.perTransactionLimit()),
+                new VelocityRule(settings.maxDailyCount()),
+                new BalanceRule()), authCodes);
     }
 
     public AuthorizationResult evaluate(AuthorizationContext context) {
