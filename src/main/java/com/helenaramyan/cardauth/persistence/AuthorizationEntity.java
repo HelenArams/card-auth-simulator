@@ -1,5 +1,6 @@
 package com.helenaramyan.cardauth.persistence;
 
+import com.helenaramyan.cardauth.domain.Authorization;
 import com.helenaramyan.cardauth.domain.AuthorizationRequest;
 import com.helenaramyan.cardauth.domain.AuthorizationResult;
 import com.helenaramyan.cardauth.domain.Merchant;
@@ -81,6 +82,10 @@ public class AuthorizationEntity {
 
     public AuthorizationResult toResult() {
         return new AuthorizationResult(approved, ResponseCode.fromCode(responseCode), reason, authCode);
+    }
+
+    public Authorization toDomain() {
+        return new Authorization(id, toRequest(), toResult(), createdAt);
     }
 
     public UUID getId() {

@@ -24,3 +24,11 @@ management:
     web:
       exposure:
         include: health,info,metrics
+
+cardauth:
+  rules:
+    # merchant category codes the issuer refuses outright (gambling, quasi-cash)
+    blocked-mccs: [7995, 6051]
+    # per-transaction cap and daily approval count; amounts are in minor units
+    per-transaction-limit: 75000
+    max-daily-count: 10
