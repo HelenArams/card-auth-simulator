@@ -154,6 +154,73 @@ class AuthorizationApiTest {
     }
 
     @Test
+    void reversalReleasesTheHoldAndIsVisibleOnTheCard() throws Exception {
+        String created = mvc.perform(post("/v1/authorizations").contentType(MediaType.APPLICATION_JSON)
+                        .content(body("tok_visa_1111", 20_000, "EUR", "5411")))
+                .andReturn().getResponse().getContentAsString();
+        String id = JsonPath.read(created, "$.id");
+
+        mvc.perform(get("/v1/cards/tok_visa_1111"))
+                .andExpect(jsonPath("$.held").value(20_000))
+                .andExpect(jsonPath("$.available").value(230_000));
+
+        mvc.perform(post("/v1/authorizations/{id}/reverse", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REVERSED"))
+                .andExpect(jsonPath("$.reversedAt").value("2023-06-15T10:00:00Z"));
+
+        mvc.perform(get("/v1/cards/tok_visa_1111"))
+                .andExpect(jsonPath("$.held").value(0))
+                .andExpect(jsonPath("$.available").value(250_000));
+
+        mvc.perform(post("/v1/authorizations/{id}/reverse", id))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("/problems/authorization-not-reversible"));
+    }
+
+    @Test
+    void reversingADeclineIsAConflict() throws Exception {
+        String created = mvc.perform(post("/v1/authorizations").contentType(MediaType.APPLICATION_JSON)
+                        .content(body("tok_mc_4444", 5_000, "EUR", "5411")))
+                .andReturn().getResponse().getContentAsString();
+        String id = JsonPath.read(created, "$.id");
+
+        mvc.perform(post("/v1/authorizations/{id}/reverse", id))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("Authorization " + id + " was declined, there is nothing to reverse"));
+    }
+
+    @Test
+    void reversingAnUnknownAuthorizationIsNotFound() throws Exception {
+        mvc.perform(post("/v1/authorizations/{id}/reverse", UUID.randomUUID()))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
+    @Test
+    void cardLookupNeverShowsMoreThanTheLastFourDigits() throws Exception {
+        mvc.perform(get("/v1/cards/tok_visa_5556"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.maskedPan").value("**** **** **** 5556"))
+                .andExpect(jsonPath("$.expiry").value("2029-12"))
+                .andExpect(jsonPath("$.status").value("BLOCKED"))
+                .andExpect(jsonPath("$.currency").value("EUR"))
+                .andExpect(jsonPath("$.balance").value(50_000))
+                .andExpect(jsonPath("$.dailyLimit").value(100_000))
+                .andExpect(jsonPath("$.last4").doesNotExist());
+    }
+
+    @Test
+    void unknownCardIsAProblemDetail() throws Exception {
+        mvc.perform(get("/v1/cards/tok_nobody"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("/problems/card-not-found"))
+                .andExpect(jsonPath("$.detail").value("No card for token tok_nobody"));
+    }
+
+    @Test
     void publishesAnOpenApiDocument() throws Exception {
         mvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())

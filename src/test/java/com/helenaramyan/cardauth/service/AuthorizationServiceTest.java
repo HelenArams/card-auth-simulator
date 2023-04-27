@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.helenaramyan.cardauth.domain.Authorization;
 import com.helenaramyan.cardauth.domain.AuthorizationRequest;
+import com.helenaramyan.cardauth.domain.AuthorizationStatus;
 import com.helenaramyan.cardauth.domain.Merchant;
 import com.helenaramyan.cardauth.domain.ResponseCode;
 import com.helenaramyan.cardauth.persistence.CardRepository;
@@ -86,6 +87,34 @@ class AuthorizationServiceTest {
         Authorization clean = service.authorize(request("tok_visa_1111", 1_000));
 
         assertThat(clean.approved()).isTrue();
+    }
+
+    @Test
+    void reversalReleasesTheHold() {
+        Authorization authorization = service.authorize(request("tok_visa_1111", 20_000));
+        assertThat(cards.findById("tok_visa_1111").orElseThrow().available()).isEqualTo(230_000);
+
+        Authorization reversed = service.reverse(authorization.id());
+
+        assertThat(reversed.status()).isEqualTo(AuthorizationStatus.REVERSED);
+        assertThat(reversed.reversedAt()).isEqualTo(FixedClockConfiguration.NOW);
+        assertThat(reversed.result().authCode()).isEqualTo(authorization.result().authCode());
+        assertThat(cards.findById("tok_visa_1111").orElseThrow().available()).isEqualTo(250_000);
+    }
+
+    @Test
+    void cannotReverseTwiceOrReverseADecline() {
+        Authorization approved = service.authorize(request("tok_visa_1111", 100));
+        Authorization declined = service.authorize(request("tok_mc_4444", 5_000));
+        service.reverse(approved.id());
+
+        assertThatThrownBy(() -> service.reverse(approved.id()))
+                .isInstanceOf(AuthorizationNotReversibleException.class)
+                .hasMessageContaining("already reversed");
+        assertThatThrownBy(() -> service.reverse(declined.id()))
+                .isInstanceOf(AuthorizationNotReversibleException.class)
+                .hasMessageContaining("declined");
+        assertThat(cards.findById("tok_visa_1111").orElseThrow().available()).isEqualTo(250_000);
     }
 
     @Test

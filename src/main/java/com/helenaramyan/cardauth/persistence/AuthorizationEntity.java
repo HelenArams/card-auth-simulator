@@ -59,6 +59,9 @@ public class AuthorizationEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @Column(name = "reversed_at")
+    private Instant reversedAt;
+
     protected AuthorizationEntity() {
     }
 
@@ -85,7 +88,21 @@ public class AuthorizationEntity {
     }
 
     public Authorization toDomain() {
-        return new Authorization(id, toRequest(), toResult(), createdAt);
+        return new Authorization(id, toRequest(), toResult(), createdAt, reversedAt);
+    }
+
+    public void reverse(Instant at) {
+        if (!approved) {
+            throw new IllegalStateException("Authorization " + id + " was declined, nothing to reverse");
+        }
+        if (reversedAt != null) {
+            throw new IllegalStateException("Authorization " + id + " was already reversed at " + reversedAt);
+        }
+        reversedAt = at;
+    }
+
+    public boolean isReversed() {
+        return reversedAt != null;
     }
 
     public UUID getId() {

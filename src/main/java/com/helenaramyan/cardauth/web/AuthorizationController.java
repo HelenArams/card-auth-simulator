@@ -50,6 +50,17 @@ public class AuthorizationController {
         return ResponseEntity.created(location).body(AuthorizationResponse.from(authorization));
     }
 
+    @PostMapping("/{id}/reverse")
+    @Operation(summary = "Reverse an approved authorization", description = "Releases the hold on the card. Idempotent in spirit but not in practice: a second call is a 409.")
+    @ApiResponse(responseCode = "200", description = "Hold released")
+    @ApiResponse(responseCode = "404", description = "Unknown authorization id",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE, schema = @Schema(implementation = ProblemDetail.class)))
+    @ApiResponse(responseCode = "409", description = "Authorization was declined or already reversed",
+            content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE, schema = @Schema(implementation = ProblemDetail.class)))
+    public AuthorizationResponse reverse(@PathVariable UUID id) {
+        return AuthorizationResponse.from(service.reverse(id));
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Fetch a previous authorization")
     @ApiResponse(responseCode = "200", description = "The authorization")

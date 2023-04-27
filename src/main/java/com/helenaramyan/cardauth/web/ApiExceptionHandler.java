@@ -1,6 +1,8 @@
 package com.helenaramyan.cardauth.web;
 
 import com.helenaramyan.cardauth.service.AuthorizationNotFoundException;
+import com.helenaramyan.cardauth.service.AuthorizationNotReversibleException;
+import com.helenaramyan.cardauth.service.CardNotFoundException;
 import com.helenaramyan.cardauth.service.CurrencyMismatchException;
 import java.net.URI;
 import org.springframework.http.HttpHeaders;
@@ -40,6 +42,16 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(AuthorizationNotFoundException.class)
     ProblemDetail authorizationNotFound(AuthorizationNotFoundException ex) {
         return problem(HttpStatus.NOT_FOUND, "authorization-not-found", "Authorization not found", ex.getMessage());
+    }
+
+    @ExceptionHandler(CardNotFoundException.class)
+    ProblemDetail cardNotFound(CardNotFoundException ex) {
+        return problem(HttpStatus.NOT_FOUND, "card-not-found", "Card not found", ex.getMessage());
+    }
+
+    @ExceptionHandler(AuthorizationNotReversibleException.class)
+    ProblemDetail notReversible(AuthorizationNotReversibleException ex) {
+        return problem(HttpStatus.CONFLICT, "authorization-not-reversible", "Authorization cannot be reversed", ex.getMessage());
     }
 
     @ExceptionHandler(CurrencyMismatchException.class)

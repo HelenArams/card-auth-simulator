@@ -63,6 +63,25 @@ public class AuthorizationService {
         return saved.toDomain();
     }
 
+    @Transactional
+    public Authorization reverse(UUID id) {
+        AuthorizationEntity authorization = authorizations.findById(id)
+                .orElseThrow(() -> new AuthorizationNotFoundException(id));
+        if (!authorization.isApproved()) {
+            throw new AuthorizationNotReversibleException("Authorization " + id + " was declined, there is nothing to reverse");
+        }
+        if (authorization.isReversed()) {
+            throw new AuthorizationNotReversibleException("Authorization " + id + " is already reversed");
+        }
+        // lock the card first, same as authorize(), so the two never race on the hold
+        CardEntity card = cards.lockByToken(authorization.getCardToken())
+                .orElseThrow(() -> new IllegalStateException("Card vanished for authorization " + id));
+        card.release(authorization.getAmount());
+        authorization.reverse(clock.instant());
+        log.info("Authorization {} on {} reversed, released {}", id, card.getToken(), authorization.getAmount());
+        return authorization.toDomain();
+    }
+
     @Transactional(readOnly = true)
     public Authorization find(UUID id) {
         return authorizations.findById(id)
