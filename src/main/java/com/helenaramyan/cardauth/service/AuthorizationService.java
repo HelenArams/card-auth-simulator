@@ -43,6 +43,27 @@ public class AuthorizationService {
 
     @Transactional
     public Authorization authorize(AuthorizationRequest request) {
+        return authorize(request, null).authorization();
+    }
+
+    /**
+     * Same as {@link #authorize(AuthorizationRequest)}, but a repeated key returns the first
+     * decision instead of deciding again. Acquirers retry on timeouts, and without this a
+     * retry would place a second hold.
+     */
+    @Transactional
+    public AuthorizationOutcome authorize(AuthorizationRequest request, String idempotencyKey) {
+        if (idempotencyKey != null) {
+            Optional<AuthorizationEntity> previous = authorizations.findByIdempotencyKey(idempotencyKey);
+            if (previous.isPresent()) {
+                if (!previous.get().toRequest().equals(request)) {
+                    throw new IdempotencyKeyReusedException(idempotencyKey);
+                }
+                return new AuthorizationOutcome(previous.get().toDomain(), true);
+            }
+        }
+        // NOTE: two concurrent first attempts with the same key both get here; the unique
+        // constraint makes the second one fail instead of double-holding. Good enough for now.
         Instant now = clock.instant();
         Optional<CardEntity> card = cards.lockByToken(request.cardToken());
         card.ifPresent(c -> requireSameCurrency(c, request));
@@ -57,10 +78,10 @@ public class AuthorizationService {
             card.orElseThrow().hold(request.amount());
         }
 
-        AuthorizationEntity saved = authorizations.save(new AuthorizationEntity(request, result, now));
+        AuthorizationEntity saved = authorizations.save(new AuthorizationEntity(request, result, now, idempotencyKey));
         log.info("Authorization {} on {}: {} {} ({})", saved.getId(), request.cardToken(),
                 result.approved() ? "approved" : "declined", result.responseCode().code(), result.reason());
-        return saved.toDomain();
+        return new AuthorizationOutcome(saved.toDomain(), false);
     }
 
     @Transactional

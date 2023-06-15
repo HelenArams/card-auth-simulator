@@ -1,5 +1,6 @@
 package com.helenaramyan.cardauth.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -218,6 +219,55 @@ class AuthorizationApiTest {
                 .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.type").value("/problems/card-not-found"))
                 .andExpect(jsonPath("$.detail").value("No card for token tok_nobody"));
+    }
+
+    @Test
+    void repeatedIdempotencyKeyReplaysTheFirstDecision() throws Exception {
+        String first = mvc.perform(post("/v1/authorizations").contentType(MediaType.APPLICATION_JSON)
+                        .header("Idempotency-Key", "retry-42")
+                        .content(body("tok_visa_1111", 5_000, "EUR", "5411")))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Idempotent-Replayed", "false"))
+                .andReturn().getResponse().getContentAsString();
+
+        String second = mvc.perform(post("/v1/authorizations").contentType(MediaType.APPLICATION_JSON)
+                        .header("Idempotency-Key", "retry-42")
+                        .content(body("tok_visa_1111", 5_000, "EUR", "5411")))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Idempotent-Replayed", "true"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(second).isEqualTo(first);
+        // only one hold, not two
+        mvc.perform(get("/v1/cards/tok_visa_1111"))
+                .andExpect(jsonPath("$.held").value(5_000));
+    }
+
+    @Test
+    void sameKeyWithADifferentBodyIsAConflict() throws Exception {
+        mvc.perform(post("/v1/authorizations").contentType(MediaType.APPLICATION_JSON)
+                        .header("Idempotency-Key", "retry-43")
+                        .content(body("tok_visa_1111", 5_000, "EUR", "5411")))
+                .andExpect(status().isCreated());
+
+        mvc.perform(post("/v1/authorizations").contentType(MediaType.APPLICATION_JSON)
+                        .header("Idempotency-Key", "retry-43")
+                        .content(body("tok_visa_1111", 6_000, "EUR", "5411")))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("/problems/idempotency-key-reused"));
+    }
+
+    @Test
+    void withoutAKeyEveryCallIsANewDecision() throws Exception {
+        for (int i = 0; i < 2; i++) {
+            mvc.perform(post("/v1/authorizations").contentType(MediaType.APPLICATION_JSON)
+                            .content(body("tok_visa_1111", 5_000, "EUR", "5411")))
+                    .andExpect(status().isCreated());
+        }
+
+        mvc.perform(get("/v1/cards/tok_visa_1111"))
+                .andExpect(jsonPath("$.held").value(10_000));
     }
 
     @Test

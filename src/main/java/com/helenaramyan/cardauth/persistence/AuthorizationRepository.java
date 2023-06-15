@@ -2,12 +2,15 @@ package com.helenaramyan.cardauth.persistence;
 
 import com.helenaramyan.cardauth.domain.rules.DailyActivity;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface AuthorizationRepository extends JpaRepository<AuthorizationEntity, UUID> {
+
+    Optional<AuthorizationEntity> findByIdempotencyKey(String idempotencyKey);
 
     /**
      * Approved activity on a card since the given instant, used by the velocity rule.

@@ -4,6 +4,8 @@ import com.helenaramyan.cardauth.service.AuthorizationNotFoundException;
 import com.helenaramyan.cardauth.service.AuthorizationNotReversibleException;
 import com.helenaramyan.cardauth.service.CardNotFoundException;
 import com.helenaramyan.cardauth.service.CurrencyMismatchException;
+import com.helenaramyan.cardauth.service.IdempotencyKeyReusedException;
+import jakarta.validation.ConstraintViolationException;
 import java.net.URI;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -52,6 +54,16 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(AuthorizationNotReversibleException.class)
     ProblemDetail notReversible(AuthorizationNotReversibleException ex) {
         return problem(HttpStatus.CONFLICT, "authorization-not-reversible", "Authorization cannot be reversed", ex.getMessage());
+    }
+
+    @ExceptionHandler(IdempotencyKeyReusedException.class)
+    ProblemDetail idempotencyKeyReused(IdempotencyKeyReusedException ex) {
+        return problem(HttpStatus.CONFLICT, "idempotency-key-reused", "Idempotency key reused", ex.getMessage());
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    ProblemDetail constraintViolation(ConstraintViolationException ex) {
+        return problem(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed", ex.getMessage());
     }
 
     @ExceptionHandler(CurrencyMismatchException.class)

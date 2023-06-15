@@ -11,6 +11,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -19,7 +20,8 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "authorizations",
-        indexes = @Index(name = "idx_authorizations_card_created", columnList = "card_token, created_at"))
+        indexes = @Index(name = "idx_authorizations_card_created", columnList = "card_token, created_at"),
+        uniqueConstraints = @UniqueConstraint(name = "uk_authorizations_idempotency_key", columnNames = "idempotency_key"))
 public class AuthorizationEntity {
 
     @Id
@@ -62,10 +64,19 @@ public class AuthorizationEntity {
     @Column(name = "reversed_at")
     private Instant reversedAt;
 
+    @Column(name = "idempotency_key", length = 64)
+    private String idempotencyKey;
+
     protected AuthorizationEntity() {
     }
 
     public AuthorizationEntity(AuthorizationRequest request, AuthorizationResult result, Instant createdAt) {
+        this(request, result, createdAt, null);
+    }
+
+    public AuthorizationEntity(AuthorizationRequest request, AuthorizationResult result, Instant createdAt,
+                               String idempotencyKey) {
+        this.idempotencyKey = idempotencyKey;
         this.cardToken = request.cardToken();
         this.amount = request.amount();
         this.currency = request.currency();
