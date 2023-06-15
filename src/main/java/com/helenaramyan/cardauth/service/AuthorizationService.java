@@ -14,6 +14,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -32,13 +34,15 @@ public class AuthorizationService {
     private final AuthorizationRepository authorizations;
     private final RulePipeline pipeline;
     private final Clock clock;
+    private final MeterRegistry meters;
 
     public AuthorizationService(CardRepository cards, AuthorizationRepository authorizations,
-                                RulePipeline pipeline, Clock clock) {
+                                RulePipeline pipeline, Clock clock, MeterRegistry meters) {
         this.cards = cards;
         this.authorizations = authorizations;
         this.pipeline = pipeline;
         this.clock = clock;
+        this.meters = meters;
     }
 
     @Transactional
@@ -79,6 +83,7 @@ public class AuthorizationService {
         }
 
         AuthorizationEntity saved = authorizations.save(new AuthorizationEntity(request, result, now, idempotencyKey));
+        countOutcome(result);
         log.info("Authorization {} on {}: {} {} ({})", saved.getId(), request.cardToken(),
                 result.approved() ? "approved" : "declined", result.responseCode().code(), result.reason());
         return new AuthorizationOutcome(saved.toDomain(), false);
@@ -108,6 +113,16 @@ public class AuthorizationService {
         return authorizations.findById(id)
                 .map(AuthorizationEntity::toDomain)
                 .orElseThrow(() -> new AuthorizationNotFoundException(id));
+    }
+
+    // replays are deliberately not counted, they are not new decisions
+    private void countOutcome(AuthorizationResult result) {
+        Counter.builder("authorizations")
+                .description("Authorization decisions by outcome and ISO 8583 response code")
+                .tag("outcome", result.approved() ? "approved" : "declined")
+                .tag("code", result.responseCode().code())
+                .register(meters)
+                .increment();
     }
 
     private static void requireSameCurrency(CardEntity card, AuthorizationRequest request) {
