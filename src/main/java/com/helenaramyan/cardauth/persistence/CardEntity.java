@@ -67,6 +67,7 @@ public class CardEntity {
         return balance - held;
     }
 
+    // TODO: no capture/settlement yet, so holds only ever go away through a reversal
     public void hold(long amount) {
         if (amount <= 0) {
             throw new IllegalArgumentException("Hold amount must be positive");
