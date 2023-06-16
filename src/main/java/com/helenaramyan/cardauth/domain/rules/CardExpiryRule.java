@@ -26,7 +26,8 @@ public final class CardExpiryRule implements CardRule {
             return Optional.of(Decline.of(ResponseCode.EXPIRED_CARD, "Card is marked expired"));
         }
         LocalDate today = LocalDate.now(clock);
-        if (card.expiry().atDay(1).isBefore(today)) {
+        // a card printed 06/23 is good until 30 June inclusive, not until 1 June
+        if (card.expiry().atEndOfMonth().isBefore(today)) {
             return Optional.of(Decline.of(ResponseCode.EXPIRED_CARD, "Card expired " + card.expiry()));
         }
         return Optional.empty();

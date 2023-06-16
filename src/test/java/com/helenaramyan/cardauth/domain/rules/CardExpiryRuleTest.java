@@ -35,6 +35,24 @@ class CardExpiryRuleTest {
     }
 
     @Test
+    void cardIsStillGoodDuringItsExpiryMonth() {
+        var decline = rule.evaluate(AuthorizationContext.of(Fixtures.request(1_000), Fixtures.cardExpiring(YearMonth.of(2023, 6))));
+
+        assertThat(decline).isEmpty();
+    }
+
+    @Test
+    void cardIsGoodOnTheLastDayAndExpiredTheDayAfter() {
+        var expiry = YearMonth.of(2023, 6);
+        var lastDay = new CardExpiryRule(Clock.fixed(Instant.parse("2023-06-30T23:59:00Z"), ZoneOffset.UTC));
+        var dayAfter = new CardExpiryRule(Clock.fixed(Instant.parse("2023-07-01T00:00:00Z"), ZoneOffset.UTC));
+        var context = AuthorizationContext.of(Fixtures.request(1_000), Fixtures.cardExpiring(expiry));
+
+        assertThat(lastDay.evaluate(context)).isEmpty();
+        assertThat(dayAfter.evaluate(context)).isPresent();
+    }
+
+    @Test
     void allowsCardExpiringNextYear() {
         var decline = rule.evaluate(AuthorizationContext.of(Fixtures.request(1_000), Fixtures.cardExpiring(YearMonth.of(2024, 6))));
 
