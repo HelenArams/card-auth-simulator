@@ -17,7 +17,7 @@ public class OpenApiConfiguration {
                 .version("v1")
                 .description("Issuer-side authorization decisions with ISO 8583 response codes. "
                         + "Amounts are in minor units; cards are addressed by token, never by PAN.")
-                .contact(new Contact().name("Helen Aramyan").url("https://helenarams.github.io"))
+                .contact(new Contact().name("Helen Aramyan").url("https://helendev.com"))
                 .license(new License().name("MIT").url("https://opensource.org/licenses/MIT")));
     }
 }
